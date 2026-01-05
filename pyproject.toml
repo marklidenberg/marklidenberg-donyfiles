@@ -1,6 +1,6 @@
 [project]
 name = "marklidenberg-donyfiles"
-version = "0.3.1"
+version = "0.3.2"
 description = "Collection of dony scripts for common development workflows"
 readme = "README.md"
 requires-python = ">=3.8"
