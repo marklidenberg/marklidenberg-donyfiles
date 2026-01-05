@@ -1,0 +1,11 @@
+import dony
+
+
+# for detect-secrets python pre-commit hook
+@dony.command(run_from="git_root")
+def updates_secrets_baseline():
+    dony.shell("""
+        set -euo pipefail
+        uv tool install detect-secrets
+        uvx detect-secrets scan > .secrets.baseline
+    """)
