@@ -2,7 +2,7 @@ import dony
 
 
 # for detect-secrets python pre-commit hook
-def updates_secrets_baseline():
+def update_secrets_baseline():
     dony.shell("""
         set -euo pipefail
         uv tool install detect-secrets
