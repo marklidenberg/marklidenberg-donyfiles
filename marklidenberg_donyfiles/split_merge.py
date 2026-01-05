@@ -2,6 +2,7 @@ import re
 
 import dony
 
+
 def has_local_changes():
     try:
         dony.shell(
@@ -13,7 +14,6 @@ def has_local_changes():
         return True
 
 
-@dony.command(run_from="git_root")
 def split_merge():
     """Helper for merging the current branch into main without a PR:
     - allows splitting changes into multiple commits,
@@ -111,4 +111,4 @@ def split_merge():
 
 
 if __name__ == "__main__":
-    split_merge()
+    dony.command(run_from="git_root")(split_merge)()

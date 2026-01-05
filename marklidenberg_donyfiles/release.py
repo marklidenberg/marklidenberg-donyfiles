@@ -5,7 +5,6 @@ import dony
 from dotenv import load_dotenv
 
 
-@dony.command(run_from="git_root")
 def release(
     version: Optional[str] = None,
     uv_publish_token: Optional[str] = None,
@@ -49,6 +48,7 @@ def release(
     # - Go to main
 
     dony.shell(f"""
+
         # - Exit if there are staged changes
 
         git diff --cached --name-only | grep -q . && git stash
@@ -66,6 +66,7 @@ def release(
 
     dony.shell(
         f"""
+
         # - Bump
 
         VERSION=$(uv version --bump {version} --short)
@@ -102,4 +103,4 @@ def release(
 
 
 if __name__ == "__main__":
-    release()
+    dony.command(run_from="git_root")(release)()
