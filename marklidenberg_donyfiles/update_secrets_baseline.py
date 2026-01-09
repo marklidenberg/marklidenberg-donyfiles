@@ -1,5 +1,5 @@
 from functools import partial
-
+import asyncio
 import dony
 
 
@@ -17,3 +17,7 @@ async def update_secrets_baseline(path: str):
         uv tool install detect-secrets
         uvx detect-secrets scan > .secrets.baseline
     """)
+
+
+if __name__ == "__main__":
+    asyncio.run(update_secrets_baseline(path=__file__))

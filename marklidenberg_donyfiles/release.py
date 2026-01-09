@@ -1,4 +1,5 @@
 import os
+import asyncio
 from functools import partial
 from typing import Optional
 
@@ -110,3 +111,6 @@ async def release(
         git merge --no-edit {main_branch} && git push
         """
     )
+
+if __name__ == "__main__":
+    asyncio.run(release(path=__file__))
