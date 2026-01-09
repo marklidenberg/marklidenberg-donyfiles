@@ -1,11 +1,12 @@
 import re
-
+from functools import partial
+import asyncio
 import dony
 
 
-def has_local_changes():
+async def has_local_changes(shell):
     try:
-        dony.shell(
+        await shell(
             "git diff-index --quiet HEAD --",
             quiet=True,
         )
@@ -14,22 +15,30 @@ def has_local_changes():
         return True
 
 
-def split_merge():
+@dony.command()
+async def split_merge(path: str):
     """Helper for merging the current branch into main without a PR:
     - allows splitting changes into multiple commits,
     - unnecessary changes can be stashed,
     - result — clean history in main.
     """
 
+    # - Set up shell with run_from
+
+    shell = partial(
+        dony.shell,
+        run_from=dony.find_repo_root(path),
+    )
+
     # - Check that github email is properly set
 
-    email = dony.shell("git config --global user.email", quiet=True).strip()
+    email = (await shell("git config --global user.email", quiet=True)).strip()
 
     if not email:
-        return dony.error("Global git user.email is NOT set.")
+        return await dony.error("Global git user.email is NOT set.")
 
     if not re.match(r"^\d+\+[^@]+@users\.noreply\.github\.com$", email):
-        return dony.error(
+        return await dony.error(
             """
             Email does not match github noreply format
             Go to https://github.com/settings/emails to get it and set it with git config --global user.email "123456+username@users.noreply.github.com" command
@@ -38,9 +47,9 @@ def split_merge():
 
     # - Get target branch
 
-    target_branch = dony.input(
+    target_branch = await dony.input(
         "Target branch:",
-        default=dony.shell(
+        default=await shell(
             "git branch --list main | grep -q main && echo main || echo master",
             quiet=True,
         ),
@@ -48,22 +57,22 @@ def split_merge():
 
     # - Check if target branch exists
 
-    if dony.shell(f"git branch --list {target_branch}") == "":
-        return dony.error(f"Target branch {target_branch} does not exist")
+    if await shell(f"git branch --list {target_branch}") == "":
+        return await dony.error(f"Target branch {target_branch} does not exist")
 
     # - Get current branch
 
-    merged_branch = dony.shell(
+    merged_branch = await shell(
         "git branch --show-current",
         quiet=True,
     )
 
     # - Merge with target branch first
 
-    if has_local_changes():
-        return dony.error("You have local changes. Please commit them first.")
+    if await has_local_changes(shell):
+        return await dony.error("You have local changes. Please commit them first.")
 
-    dony.shell(
+    await shell(
         f"""
 
         # - Push current branch
@@ -80,28 +89,28 @@ def split_merge():
 
     # - Checkout to target branch
 
-    dony.shell(f"git checkout {target_branch}")
+    await shell(f"git checkout {target_branch}")
 
     # - Apply restore from merged branch UNSTAGED
 
-    dony.shell(f"git restore --source={merged_branch} --worktree .")
+    await shell(f"git restore --source={merged_branch} --worktree .")
 
     # - Wait for the user to do commits
 
     while True:
-        dony.press_any_key("Press any key when you are done with commits...")
+        await dony.press_any_key("Press any key when you are done with commits...")
 
-        if not has_local_changes():
+        if not await has_local_changes(shell):
             break
 
-        dony.echo("You have local changes")
-        if dony.confirm("Stash and proceed?"):
-            dony.shell("git stash --include-untracked")
+        await dony.echo("You have local changes")
+        if await dony.confirm("Stash and proceed?"):
+            await shell("git stash --include-untracked")
             break
 
     # - When done - remove original branch and push main
 
-    dony.shell(
+    await shell(
         f"""
         git branch -D {merged_branch}
         git push origin --delete {merged_branch}
@@ -111,4 +120,4 @@ def split_merge():
 
 
 if __name__ == "__main__":
-    dony.command(run_from="git_root")(split_merge)()
+    asyncio.run(split_merge(path=__file__))

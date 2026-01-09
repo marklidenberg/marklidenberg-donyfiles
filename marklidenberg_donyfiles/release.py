@@ -1,15 +1,25 @@
 import os
+from functools import partial
 from typing import Optional
 
 import dony
 from dotenv import load_dotenv
 
 
-def release(
+@dony.command()
+async def release(
+    path: str,
     version: Optional[str] = None,
     uv_publish_token: Optional[str] = None,
 ):
     """Bump version and publish to PyPI"""
+
+    # - Set up shell with run_from
+
+    shell = partial(
+        dony.shell,
+        run_from=dony.find_repo_root(path),
+    )
 
     # - Load .env
 
@@ -17,14 +27,14 @@ def release(
 
     # - Get main branch
 
-    main_branch = dony.shell(
+    main_branch = await shell(
         "git branch --list main | grep -q main && echo main || echo master",
         quiet=True,
     )
 
     # - Select default arguments
 
-    version = version or dony.select(
+    version = version or await dony.select(
         "Choose version",
         choices=[
             "patch",
@@ -33,21 +43,21 @@ def release(
         ],
     )
 
-    uv_publish_token = uv_publish_token or dony.input(
+    uv_publish_token = uv_publish_token or await dony.input(
         "Enter UV publish token (usually a PyPI token)",
         default=os.getenv("UV_PUBLISH_TOKEN", ""),
     )
 
     # - Get current branch
 
-    original_branch = dony.shell(
+    original_branch = await shell(
         "git branch --show-current",
         quiet=True,
     )
 
     # - Go to main
 
-    dony.shell(f"""
+    await shell(f"""
 
         # - Exit if there are staged changes
 
@@ -64,7 +74,7 @@ def release(
 
     # - Bump
 
-    dony.shell(
+    await shell(
         f"""
 
         # - Bump
@@ -84,7 +94,7 @@ def release(
 
     # - Build and publish
 
-    dony.shell(
+    await shell(
         f"""
         rm -rf dist/* # remove old builds
         uv build
@@ -94,13 +104,9 @@ def release(
 
     # - Go back to original branch
 
-    dony.shell(
+    await shell(
         f"""
         git checkout {original_branch}
         git merge --no-edit {main_branch} && git push
         """
     )
-
-
-if __name__ == "__main__":
-    dony.command(run_from="git_root")(release)()

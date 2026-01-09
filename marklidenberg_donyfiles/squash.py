@@ -1,44 +1,53 @@
 import re
+from functools import partial
+import asyncio
+import dony
 
-import dony  # type: ignore
 
-
-def squash():
+@dony.command()
+async def squash(path: str):
     """Squashes current branch into target branch"""
+
+    # - Set up shell with run_from
+
+    shell = partial(
+        dony.shell,
+        run_from=dony.find_repo_root(path),
+    )
 
     # - Get target branch
 
-    default_branch = dony.shell(
+    default_branch = await shell(
         "git branch --list main | grep -q main && echo main || echo master",
         quiet=True,
     )
-    target_branch = dony.input(
+    target_branch = await dony.input(
         "Enter target branch:",
         default=default_branch or "",
     )
 
     # - Get current branch
 
-    merged_branch = dony.shell(
+    merged_branch = await shell(
         "git branch --show-current",
         quiet=True,
     )
 
     # - Merge with target branch first
 
-    dony.shell(
+    await shell(
         f"""
 
         # push if there are unpushed commits
         git diff --name-only | grep -q . && git push
-        
+
         git fetch origin
         git checkout {target_branch}
         git pull
         git checkout {merged_branch}
 
         git merge {target_branch}
-        
+
         if ! git diff-index --quiet HEAD --; then
 
           # try to commit twice, in case of formatting errors that are fixed by the first commit
@@ -52,10 +61,10 @@ def squash():
 
     # - Do git diff
 
-    dony.shell(
+    await shell(
         f"""
         root=$(git rev-parse --show-toplevel)
-        
+
         git diff {target_branch} --name-only -z \
         | while IFS= read -r -d '' file; do
             full="$root/$file"
@@ -69,46 +78,45 @@ def squash():
 
     # - Ask user to confirm
 
-    if not dony.confirm("Start squashing?"):
+    if not await dony.confirm("Start squashing?"):
         return
 
     # - Check if target branch exists
 
     if (
-        dony.shell(
+        await shell(
             f"""
         git branch --list {target_branch}
     """
         )
         == ""
     ):
-        return dony.error(f"Target branch {target_branch} does not exist")
+        return await dony.error(f"Target branch {target_branch} does not exist")
 
     # - Get commit message from the user
 
-    if not commit_message:
-        while True:
-            commit_message = dony.input(
-                f"Enter commit message for merging branch {merged_branch} to {target_branch}:"
+    while True:
+        commit_message = await dony.input(
+            f"Enter commit message for merging branch {merged_branch} to {target_branch}:"
+        )
+        if bool(
+            re.match(
+                r"^(?:(?:feat|fix|docs|style|refactor|perf|test|chore|build|ci|revert)(?:\([A-Za-z0-9_-]+\))?(!)?:)\s.+$",
+                commit_message.splitlines()[0],
             )
-            if bool(
-                re.match(
-                    r"^(?:(?:feat|fix|docs|style|refactor|perf|test|chore|build|ci|revert)(?:\([A-Za-z0-9_-]+\))?(!)?:)\s.+$",
-                    commit_message.splitlines()[0],
-                )
-            ):
-                break
-            dony.print("Only conventional commits are allowed, try again")
+        ):
+            break
+        await dony.echo("Only conventional commits are allowed, try again")
 
     # - Check if user wants to remove merged branch
 
-    remove_merged_branch = dony.confirm(
+    remove_merged_branch = await dony.confirm(
         f"Remove merged branch {merged_branch}?",
     )
 
     # - Do the process
 
-    dony.shell(
+    await shell(
         f"""
 
         # - Make up to date
@@ -129,10 +137,10 @@ def squash():
         # - Merge
 
         git merge --squash {merged_branch}
-        
+
         # try to commit twice, in case of formatting errors that are fixed by the first commit
         git commit -m "{commit_message}" || git commit -m "{commit_message}"
-        git push 
+        git push
 
         # - Remove merged branch
 
@@ -145,4 +153,4 @@ def squash():
 
 
 if __name__ == "__main__":
-    dony.command(run_from="git_root")(squash)()
+    asyncio.run(squash(path=__file__))

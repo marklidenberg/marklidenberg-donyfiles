@@ -1,11 +1,19 @@
+from functools import partial
+
 import dony
 
 
-# for detect-secrets python pre-commit hook
-def update_secrets_baseline():
-    dony.shell("""
+@dony.command()
+async def update_secrets_baseline(path: str):
+    """For detect-secrets python pre-commit hook"""
+
+    shell = partial(
+        dony.shell,
+        run_from=dony.find_repo_root(path),
+    )
+
+    await shell("""
         set -euo pipefail
         uv tool install detect-secrets
         uvx detect-secrets scan > .secrets.baseline
     """)
-
